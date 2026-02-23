@@ -8,11 +8,6 @@ LANG_CODE=$3
 MODEL="${4:-gemini-3-flash-preview}" # Fallback if not passed
 TARGET_FILE="${OUTPUT_DIR}/${LANG_CODE}.json"
 
-echo "Using Model: $MODEL"
-
-# --- STEP 1: UPLOAD ---
-# We force the 'type' to text/plain during upload so Gemini treats the JSON as readable text.
-echo "Uploading $SOURCE_FILE..."
 UPLOAD_RESPONSE=$(curl "https://generativelanguage.googleapis.com/upload/v1beta/files?key=${GEMINI_API_KEY}" \
   -H "X-Goog-Upload-Protocol: multipart" \
   -F "metadata={\"file\": {\"display_name\": \"source_json\"}};type=application/json" \
@@ -24,9 +19,6 @@ if [ "$FILE_URI" == "null" ] || [ -z "$FILE_URI" ]; then
   echo "Upload failed! Response: $UPLOAD_RESPONSE"
   exit 1
 fi
-
-# --- STEP 2: TRANSLATE ---
-echo "File uploaded: $FILE_URI. Translating..."
 
 RESPONSE=$(curl "https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}" \
   -H 'Content-Type: application/json' \
@@ -46,10 +38,6 @@ RESPONSE=$(curl "https://generativelanguage.googleapis.com/v1beta/models/${MODEL
     }
   }')
 
-# --- IMPROVED EXTRACTION ---
-# 1. We look for the part that contains the text
-# 2. We use 'gsub' to remove markdown backticks if they exist
-# 3. We use 'test' to make sure we aren't grabbing an empty "thinking" block
 EXTRACTED_TEXT=$(echo "$RESPONSE" | jq -r '
   .candidates[0].content.parts[] 
   | select(.text != null) 
@@ -60,7 +48,6 @@ EXTRACTED_TEXT=$(echo "$RESPONSE" | jq -r '
   | sub("```$"; "")
 ')
 
-# Validate if we got a real JSON object
 if [[ ! "$EXTRACTED_TEXT" =~ ^\{ ]]; then
   echo "Error: Extracted text does not look like JSON. Start of text: ${EXTRACTED_TEXT:0:50}"
   echo "Full Response for Debug:"
@@ -69,8 +56,6 @@ if [[ ! "$EXTRACTED_TEXT" =~ ^\{ ]]; then
 fi
 
 mkdir -p "$(dirname "$TARGET_FILE")"
-
-# Write it out directly - no more 'sed' needed here
 echo "$EXTRACTED_TEXT" > "$TARGET_FILE"
 
 echo "✅ Success! Saved to $TARGET_FILE"
