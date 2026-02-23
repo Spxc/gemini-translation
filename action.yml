@@ -1,0 +1,57 @@
+name: 'Gemini i18n Translator'
+description: 'Translates JSON files using Gemini and automatically creates a PR with the changes.'
+author: 'Stian Instebø'
+
+inputs:
+  model:
+    description: 'Gemini model to use'
+    default: 'gemini-3-flash-preview'
+  target_language:
+    description: 'Target language for translation (e.g., es-ES)'
+    default: 'nb-NO'
+  source_path:
+    description: 'Path to source JSON'
+    required: true
+  output_dir:
+    description: 'Output directory'
+    required: true
+  gemini_api_key:
+    description: 'API Key for Gemini'
+    required: true
+
+branding:
+  icon: 'message-square'
+  color: 'blue'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Run Translation Script
+      shell: bash
+      env:
+        GEMINI_API_KEY: ${{ inputs.gemini_api_key }}
+      run: |
+        chmod +x ${{ github.action_path }}/gemini-translate.sh
+        ${{ github.action_path }}/gemini-translate.sh "${{ inputs.source_path }}" "${{ inputs.output_dir }}" "${{ inputs.target_language }}" "${{ inputs.model }}"
+
+    - name: Push Changes and Create PR
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        git checkout -B gemini-translation
+        git add . 
+        
+        if ! git diff --cached --quiet; then
+          git commit -m "docs: auto-translation via Gemini"
+          git push origin gemini-translation --force
+          
+          if ! gh pr view gemini-translation >/dev/null 2>&1; then
+            gh pr create --title "Gemini Translation" --body "AI generated translation" --base main --head gemini-translation
+          fi
+        else
+          echo "No changes to commit."
+        fi
