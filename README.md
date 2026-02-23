@@ -67,9 +67,26 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Gemini Translator
-        uses: spxc/gemini-translation@v1
+        uses: spxc/gemini-i18n-translator@v1
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           source_path: 'locales/en.json'
           output_dir: 'locales'
           model: 'gemini-3-flash-preview'
+```
+---
+
+## Troubleshooting
+
+### Error: "Permission to createPullRequest denied"
+If your workflow fails with an error stating that the GitHub token does not have permission to create a pull request, you must adjust two settings:
+
+1. **In your Workflow File**: Ensure you have the `permissions` block explicitly defined:
+   ```yaml
+   permissions:
+     contents: write
+     pull-requests: write
+2. **In your repo**: Ensure you have setup workflow permissions
+    - Go to Settings > Actions > General.
+    - Scroll to Workflow permissions.
+    - Check the box: "Allow GitHub Actions to create and approve pull requests".
