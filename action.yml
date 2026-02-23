@@ -7,8 +7,9 @@ inputs:
     description: 'Gemini model to use'
     default: 'gemini-3-flash-preview'
   target_language:
-    description: 'Target language for translation (e.g., es-ES)'
+    description: 'Target language(s) for translation, comma or space separated (e.g., "nb-NO fr-FR de-DE")'
     default: 'nb-NO'
+    required: true
   source_path:
     description: 'Path to source JSON'
     required: true
