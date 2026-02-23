@@ -68,7 +68,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Gemini Translator
-        uses: spxc/gemini-i18n-translator@v1
+        uses: Spxc/gemini-translation@v1.1.0
         with:
           model: 'gemini-3-flash-preview' #optional
           target_language: 'nb-NO, fr-FR, de-DE, es-ES'
