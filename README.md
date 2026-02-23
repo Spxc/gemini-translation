@@ -24,6 +24,7 @@ This GitHub Action automatically translates i18n JSON files using Google Gemini 
 
 | Input | Description | Required | Default |
 | :--- | :--- | :--- | :--- |
+| `target_language` | Desired translation target language code | Yes | N/A |
 | `gemini_api_key` | Your Google Gemini API Key. | Yes | N/A |
 | `source_path` | Path to the source JSON file to be translated. | Yes | N/A |
 | `output_dir` | Directory where the translated files should be saved. | Yes | N/A |
@@ -69,6 +70,7 @@ jobs:
       - name: Run Gemini Translator
         uses: spxc/gemini-i18n-translator@v1
         with:
+          target_language: 'es-ES'
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           source_path: 'locales/en.json'
           output_dir: 'locales'
