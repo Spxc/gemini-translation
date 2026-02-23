@@ -4,29 +4,31 @@ set -e
 SOURCE_FILE=$1
 OUTPUT_DIR=$2
 LANG_CODES=$3
-MODEL="${4:-gemini-2.0-flash}"
+MODEL="${4:-gemini-3-flash-preview}"
 
 IFS=', ' read -r -a LANGUAGES <<< "${LANG_CODES//,/ }"
 
-UPLOAD_RESPONSE=$(curl "https://generativelanguage.googleapis.com/upload/v1beta/files?key=${GEMINI_API_KEY}" \
+echo "📤 Uploading source file..."
+UPLOAD_RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/upload/v1beta/files?key=${GEMINI_API_KEY}" \
   -H "X-Goog-Upload-Protocol: multipart" \
   -F "metadata={\"file\": {\"display_name\": \"source_json\"}};type=application/json" \
   -F "file=@${SOURCE_FILE};type=text/plain")
 
-FILE_URI=$(echo $UPLOAD_RESPONSE | jq -r '.file.uri')
+FILE_URI=$(echo "$UPLOAD_RESPONSE" | jq -r '.file.uri // empty')
 
-if [ "$FILE_URI" == "null" ] || [ -z "$FILE_URI" ]; then
-  echo "Upload failed! Response: $UPLOAD_RESPONSE"
+if [ -z "$FILE_URI" ]; then
+  echo "❌ Upload failed! Response:"
+  echo "$UPLOAD_RESPONSE" | jq .
   exit 1
 fi
 
-echo "📤 Uploaded source file: $FILE_URI"
+echo "✅ Uploaded: $FILE_URI"
 
 for LANG_CODE in "${LANGUAGES[@]}"; do
   echo "🌍 Translating to $LANG_CODE..."
   TARGET_FILE="${OUTPUT_DIR}/${LANG_CODE}.json"
 
-  RESPONSE=$(curl "https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}" \
+  RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}" \
     -H 'Content-Type: application/json' \
     -X POST \
     -d '{
@@ -44,24 +46,36 @@ for LANG_CODE in "${LANGUAGES[@]}"; do
       }
     }')
 
+  API_ERROR=$(echo "$RESPONSE" | jq -r '.error.message // empty')
+  if [ ! -z "$API_ERROR" ]; then
+    echo "❌ API Error: $API_ERROR"
+    exit 1
+  fi
+
   EXTRACTED_TEXT=$(echo "$RESPONSE" | jq -r '
-    .candidates[0].content.parts[] 
-    | select(.text != null) 
-    | .text 
-    | sub("^```json\\n"; "") 
-    | sub("\\n```$"; "") 
-    | sub("^```\\n"; "") 
-    | sub("```$"; "")
+    if .candidates and .candidates[0].content and .candidates[0].content.parts then
+      .candidates[0].content.parts[0].text
+      | sub("^```json\\n"; "") 
+      | sub("\\n```$"; "") 
+      | sub("^```\\n"; "") 
+      | sub("```$"; "")
+    else
+      empty
+    end
   ')
 
-  if [[ ! "$EXTRACTED_TEXT" =~ ^\{ ]]; then
-    echo "Error translating $LANG_CODE. Start of response: ${EXTRACTED_TEXT:0:50}"
-    echo "Full response:"
+  if [ -z "$EXTRACTED_TEXT" ] || [ "$EXTRACTED_TEXT" == "null" ]; then
+    echo "❌ No translation generated for $LANG_CODE. API Response:"
     echo "$RESPONSE" | jq .
     exit 1
   fi
 
   mkdir -p "$(dirname "$TARGET_FILE")"
   echo "$EXTRACTED_TEXT" > "$TARGET_FILE"
-  echo "Saved $TARGET_FILE"
+  echo "✅ Saved $TARGET_FILE"
+
+  echo "⏲️ Waiting for rate limit cooldown..."
+  sleep 10
 done
+
+echo "🚀 All translations completed successfully."
